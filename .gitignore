@@ -1,0 +1,6 @@
+data/
+.venv/
+repairset/
+artifacts/
+
+__pycache__
