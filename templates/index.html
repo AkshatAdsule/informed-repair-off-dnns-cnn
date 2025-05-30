@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Set Visualizer - SqueezeNet Repair</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        .image-card {
+            transition: transform 0.2s;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .image-container {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+        }
+
+        .image-container img {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+        }
+
+        .label-correct {
+            background-color: #d4edda !important;
+            color: #155724 !important;
+        }
+
+        .label-incorrect {
+            background-color: #f8d7da !important;
+            color: #721c24 !important;
+        }
+
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .plot-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .plot-container img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .nav-tabs .nav-link.active {
+            background-color: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+
+        .nav-tabs .nav-link {
+            color: #667eea;
+        }
+
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            margin: 50px 0;
+        }
+
+        .header-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <div class="header-gradient">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2"><i class="fas fa-microscope me-3"></i>Edit Set Visualizer</h1>
+                    <p class="mb-0">Explore misclassified images from SqueezeNet on ImageNet-mini</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="row">
+                        <div class="col-4">
+                            <div class="text-center">
+                                <h3 class="mb-0">{{ total_images }}</h3>
+                                <small>Total Images</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center">
+                                <h3 class="mb-0">{{ num_true_classes }}</h3>
+                                <small>True Classes</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center">
+                                <h3 class="mb-0">{{ num_pred_classes }}</h3>
+                                <small>Pred Classes</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="images-tab" data-bs-toggle="tab" data-bs-target="#images"
+                    type="button" role="tab">
+                    <i class="fas fa-images me-2"></i>Image Browser
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="distributions-tab" data-bs-toggle="tab" data-bs-target="#distributions"
+                    type="button" role="tab">
+                    <i class="fas fa-chart-bar me-2"></i>Distributions
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="analysis-tab" data-bs-toggle="tab" data-bs-target="#analysis" type="button"
+                    role="tab">
+                    <i class="fas fa-analytics me-2"></i>Analysis
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="mainTabContent">
+            <!-- Images Tab -->
+            <div class="tab-pane fade show active" id="images" role="tabpanel">
+                <div class="container-fluid mt-4">
+                    <!-- Controls -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="imagesPerPage" class="form-label">Images per page:</label>
+                            <select class="form-select" id="imagesPerPage" style="width: auto; display: inline-block;">
+                                <option value="6">6</option>
+                                <option value="12" selected>12</option>
+                                <option value="24">24</option>
+                                <option value="48">48</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button class="btn btn-primary" onclick="loadImages()">
+                                <i class="fas fa-sync-alt me-2"></i>Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loading Spinner -->
+                    <div class="loading-spinner" id="imagesLoading">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading images...</p>
+                    </div>
+
+                    <!-- Images Grid -->
+                    <div class="row" id="imagesGrid">
+                        <!-- Images will be loaded here -->
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="pagination-container">
+                        <nav>
+                            <ul class="pagination" id="imagesPagination">
+                                <!-- Pagination will be generated here -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Distributions Tab -->
+            <div class="tab-pane fade" id="distributions" role="tabpanel">
+                <div class="container-fluid mt-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="plot-container">
+                                <h4 class="mb-3"><i class="fas fa-chart-bar me-2"></i>True Classes Distribution</h4>
+                                <div id="trueClassesPlot">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading plot...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="plot-container">
+                                <h4 class="mb-3"><i class="fas fa-chart-line me-2"></i>Predicted Classes Distribution
+                                </h4>
+                                <div id="predictedClassesPlot">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading plot...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="plot-container">
+                                <h4 class="mb-3"><i class="fas fa-random me-2"></i>Top Misclassification Patterns</h4>
+                                <div id="confusionMatrixPlot">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading plot...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Tab -->
+            <div class="tab-pane fade" id="analysis" role="tabpanel">
+                <div class="container-fluid mt-4">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="plot-container">
+                                <h4 class="mb-3"><i class="fas fa-analytics me-2"></i>Edit Set Statistics</h4>
+                                <div id="statisticsContent">
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Loading statistics...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let imagesPerPage = 12;
+
+        // Load images on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            loadImages();
+            loadDistributionPlots(); // Load plots immediately on page load
+
+            // Add event listener for images per page change
+            document.getElementById('imagesPerPage').addEventListener('change', function () {
+                imagesPerPage = parseInt(this.value);
+                currentPage = 1;
+                loadImages();
+            });
+
+            // Load plots when switching tabs (but they should already be loaded)
+            document.getElementById('distributions-tab').addEventListener('click', function () {
+                loadDistributionPlots();
+            });
+
+            document.getElementById('analysis-tab').addEventListener('click', function () {
+                loadAnalysis();
+            });
+        });
+
+        function loadImages() {
+            const loading = document.getElementById('imagesLoading');
+            const grid = document.getElementById('imagesGrid');
+
+            loading.style.display = 'block';
+            grid.innerHTML = '';
+
+            fetch(`/api/images?page=${currentPage}&per_page=${imagesPerPage}`)
+                .then(response => response.json())
+                .then(data => {
+                    loading.style.display = 'none';
+                    totalPages = data.pages;
+
+                    data.images.forEach(img => {
+                        const col = document.createElement('div');
+                        col.className = `col-lg-${12 / Math.min(imagesPerPage, 6)} col-md-6 col-sm-12 mb-4`;
+
+                        const isCorrect = img.true_label === img.predicted_label;
+                        const cardClass = isCorrect ? 'label-correct' : 'label-incorrect';
+
+                        col.innerHTML = `
+                            <div class="image-card ${cardClass}">
+                                <div class="image-container">
+                                    <img src="data:image/jpeg;base64,${img.image_data}" alt="Image ${img.index}">
+                                </div>
+                                <div class="card-body p-3">
+                                    <h6 class="card-title mb-2">Image ${img.index}</h6>
+                                    <p class="card-text mb-1">
+                                        <strong>True:</strong> ${img.true_class}<br>
+                                        <small class="text-muted">Label: ${img.true_label}</small>
+                                    </p>
+                                    <p class="card-text">
+                                        <strong>Predicted:</strong> ${img.predicted_class}<br>
+                                        <small class="text-muted">Label: ${img.predicted_label}</small>
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+
+                        grid.appendChild(col);
+                    });
+
+                    updatePagination();
+                })
+                .catch(error => {
+                    loading.style.display = 'none';
+                    console.error('Error loading images:', error);
+                    grid.innerHTML = '<div class="col-12"><div class="alert alert-danger">Error loading images</div></div>';
+                });
+        }
+
+        function updatePagination() {
+            const pagination = document.getElementById('imagesPagination');
+            pagination.innerHTML = '';
+
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Previous</a>`;
+            pagination.appendChild(prevLi);
+
+            // Page numbers
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, currentPage + 2);
+
+            for (let i = startPage; i <= endPage; i++) {
+                const pageLi = document.createElement('li');
+                pageLi.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                pageLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
+                pagination.appendChild(pageLi);
+            }
+
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+            nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Next</a>`;
+            pagination.appendChild(nextLi);
+        }
+
+        function changePage(page) {
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                loadImages();
+            }
+        }
+
+        function loadDistributionPlots() {
+            // Load true classes plot
+            fetch('/api/distributions/true_classes')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.plot) {
+                        document.getElementById('trueClassesPlot').innerHTML =
+                            `<img src="data:image/png;base64,${data.plot}" alt="True Classes Distribution">`;
+                    } else {
+                        document.getElementById('trueClassesPlot').innerHTML =
+                            '<div class="alert alert-warning">No plot data available</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading true classes plot:', error);
+                    document.getElementById('trueClassesPlot').innerHTML =
+                        '<div class="alert alert-danger">Error loading true classes plot</div>';
+                });
+
+            // Load predicted classes plot
+            fetch('/api/distributions/predicted_classes')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.plot) {
+                        document.getElementById('predictedClassesPlot').innerHTML =
+                            `<img src="data:image/png;base64,${data.plot}" alt="Predicted Classes Distribution">`;
+                    } else {
+                        document.getElementById('predictedClassesPlot').innerHTML =
+                            '<div class="alert alert-warning">No plot data available</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading predicted classes plot:', error);
+                    document.getElementById('predictedClassesPlot').innerHTML =
+                        '<div class="alert alert-danger">Error loading predicted classes plot</div>';
+                });
+
+            // Load confusion matrix plot
+            fetch('/api/distributions/confusion_matrix')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.plot) {
+                        document.getElementById('confusionMatrixPlot').innerHTML =
+                            `<img src="data:image/png;base64,${data.plot}" alt="Confusion Matrix">`;
+                    } else {
+                        document.getElementById('confusionMatrixPlot').innerHTML =
+                            '<div class="alert alert-warning">No plot data available</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading confusion matrix plot:', error);
+                    document.getElementById('confusionMatrixPlot').innerHTML =
+                        '<div class="alert alert-danger">Error loading confusion matrix plot</div>';
+                });
+        }
+
+        function loadAnalysis() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    let html = '<div class="row">';
+
+                    // Summary stats
+                    html += `
+                        <div class="col-md-6">
+                            <h5>Summary Statistics</h5>
+                            <table class="table table-striped">
+                                <tr><td>Total Misclassified Images</td><td><strong>${data.total_images}</strong></td></tr>
+                                <tr><td>Unique True Classes</td><td><strong>${Object.keys(data.true_class_counts).length}</strong></td></tr>
+                                <tr><td>Unique Predicted Classes</td><td><strong>${Object.keys(data.pred_class_counts).length}</strong></td></tr>
+                                <tr><td>Misclassification Patterns</td><td><strong>${Object.keys(data.confusion_pairs).length}</strong></td></tr>
+                            </table>
+                        </div>
+                    `;
+
+                    // Top misclassified classes
+                    const sortedTrue = Object.entries(data.true_class_counts)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 10);
+
+                    html += `
+                        <div class="col-md-6">
+                            <h5>Most Misclassified True Classes</h5>
+                            <table class="table table-striped">
+                                <thead><tr><th>Class</th><th>Count</th></tr></thead>
+                                <tbody>
+                    `;
+
+                    sortedTrue.forEach(([className, count]) => {
+                        html += `<tr><td>${className}</td><td><strong>${count}</strong></td></tr>`;
+                    });
+
+                    html += '</tbody></table></div></div>';
+
+                    document.getElementById('statisticsContent').innerHTML = html;
+                });
+        }
+    </script>
+</body>
+
+</html>

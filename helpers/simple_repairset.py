@@ -113,8 +113,3 @@ def create_repairset(
     print(f"  Labels tensor shape: {edit_labels_tensor.shape}")
 
     return edit_images_tensor, edit_labels_tensor, edit_metadata
-
-
-if __name__ == "__main__":
-    model = squeezenet(pretrained=True, eval=True)
-    create_repairset(model, max_misclassified=-1)
