@@ -2,7 +2,7 @@
 
 ## Overview
 
-The experimental setup evaluates **5 main categories of heuristics** (excluding adversarial approaches as requested):
+The experimental setup evaluates **5 main categories of heuristics**:
 
 1. **Activation-Based Heuristics** - Select layers based on activation statistics
 2. **Gradient/Sensitivity-Based Heuristics** - Identify layers with highest parameter sensitivity  
