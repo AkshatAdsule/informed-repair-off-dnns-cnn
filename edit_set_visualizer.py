@@ -39,22 +39,70 @@ class EditSetVisualizer:
         self.class_to_idx = None
         self.idx_to_class = None
         self.metadata = None
-        self.load_data()
+        self.current_edit_set = None
+        self.available_edit_sets = self.discover_edit_sets()
+        # Load default edit set
+        if self.available_edit_sets:
+            self.load_edit_set(list(self.available_edit_sets.keys())[0])
+        self.load_dataset_info()
 
-    def load_data(self):
-        """Load edit set data and ImageNet-mini dataset info"""
-        # Load edit set
-        edit_path = "data/edit_sets/squeezenet_edit_dataset.pt"
-        metadata_path = "data/edit_sets/squeezenet_edit_metadata.json"
+    def discover_edit_sets(self):
+        """Discover all available edit sets in the data/edit_sets directory"""
+        edit_sets_dir = "data/edit_sets"
+        available_sets = {}
 
-        if os.path.exists(edit_path):
-            self.edit_data = torch.load(edit_path, map_location="cpu")
+        if not os.path.exists(edit_sets_dir):
+            return available_sets
 
-        if os.path.exists(metadata_path):
-            with open(metadata_path, "r") as f:
-                self.metadata = json.load(f)
+        # Look for .pt files and their corresponding .json metadata files
+        for filename in os.listdir(edit_sets_dir):
+            if filename.endswith("_dataset.pt"):
+                # Extract the base name (remove _dataset.pt)
+                base_name = filename[:-11]  # Remove "_dataset.pt"
+                metadata_file = f"{base_name}_metadata.json"
 
-        # Load dataset for class information
+                dataset_path = os.path.join(edit_sets_dir, filename)
+                metadata_path = os.path.join(edit_sets_dir, metadata_file)
+
+                if os.path.exists(metadata_path):
+                    # Get file sizes for display
+                    dataset_size = os.path.getsize(dataset_path)
+                    metadata_size = os.path.getsize(metadata_path)
+
+                    # Create a human-readable name
+                    display_name = base_name.replace("_", " ").title()
+
+                    available_sets[base_name] = {
+                        "display_name": display_name,
+                        "dataset_path": dataset_path,
+                        "metadata_path": metadata_path,
+                        "dataset_size": dataset_size,
+                        "metadata_size": metadata_size,
+                    }
+
+        return available_sets
+
+    def load_edit_set(self, edit_set_name):
+        """Load a specific edit set by name"""
+        if edit_set_name not in self.available_edit_sets:
+            raise ValueError(f"Edit set '{edit_set_name}' not found")
+
+        edit_set_info = self.available_edit_sets[edit_set_name]
+
+        # Load edit set data
+        self.edit_data = torch.load(edit_set_info["dataset_path"], map_location="cpu")
+
+        # Load metadata
+        with open(edit_set_info["metadata_path"], "r") as f:
+            self.metadata = json.load(f)
+
+        self.current_edit_set = edit_set_name
+        print(
+            f"Loaded edit set: {edit_set_info['display_name']} ({len(self.metadata)} images)"
+        )
+
+    def load_dataset_info(self):
+        """Load dataset for class information"""
         val_dir = "data/imagenet-mini/val"
         if os.path.exists(val_dir):
             # Use basic transform just to get class info
@@ -64,6 +112,20 @@ class EditSetVisualizer:
             self.dataset = ImageFolder(val_dir, transform=transform)
             self.class_to_idx = self.dataset.class_to_idx
             self.idx_to_class = {v: k for k, v in self.class_to_idx.items()}
+
+    def get_available_edit_sets(self):
+        """Return information about available edit sets"""
+        return {
+            name: {
+                "display_name": info["display_name"],
+                "num_images": len(json.load(open(info["metadata_path"])))
+                if os.path.exists(info["metadata_path"])
+                else 0,
+                "dataset_size_mb": round(info["dataset_size"] / (1024 * 1024), 1),
+                "is_current": name == self.current_edit_set,
+            }
+            for name, info in self.available_edit_sets.items()
+        }
 
     def get_image_tensor_as_base64(self, image_tensor):
         """Convert image tensor to base64 for web display"""
@@ -351,6 +413,28 @@ def index():
         num_true_classes=len(dist_data.get("true_class_counts", {})),
         num_pred_classes=len(dist_data.get("pred_class_counts", {})),
     )
+
+
+@app.route("/api/edit_sets")
+def get_edit_sets():
+    """API endpoint to get available edit sets"""
+    return jsonify(visualizer.get_available_edit_sets())
+
+
+@app.route("/api/edit_sets/<edit_set_name>", methods=["POST"])
+def switch_edit_set(edit_set_name):
+    """API endpoint to switch to a different edit set"""
+    try:
+        visualizer.load_edit_set(edit_set_name)
+        return jsonify(
+            {
+                "success": True,
+                "current_edit_set": edit_set_name,
+                "message": f"Switched to {visualizer.available_edit_sets[edit_set_name]['display_name']}",
+            }
+        )
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route("/api/images")
