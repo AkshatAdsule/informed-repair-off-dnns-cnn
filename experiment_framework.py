@@ -126,7 +126,7 @@ class RepairExperiment:
     ) -> List[Dict[str, Any]]:
         """Run repair experiments with different heuristics"""
 
-        print(f"Loading model and edit set...")
+        print("Loading model and edit set...")
         model = self.load_model()
         edit_set = self.load_edit_set(edit_set_path)
 
