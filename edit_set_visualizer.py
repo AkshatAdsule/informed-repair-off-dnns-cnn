@@ -42,7 +42,7 @@ class EditSetVisualizer:
         self.current_edit_set = None
         self.available_edit_sets = self.discover_edit_sets()
         # Load class labels mapping
-        self.class_labels = self.load_class_labels()
+        self.class_labels, self.wordnet_to_name = self.load_class_labels()
         # Load default edit set
         if self.available_edit_sets:
             self.load_edit_set(list(self.available_edit_sets.keys())[0])
@@ -55,16 +55,19 @@ class EditSetVisualizer:
             with open(labels_path, "r") as f:
                 labels_data = json.load(f)
 
-            # Convert to a mapping from class_id (string) to human-readable name
-            class_labels = {}
+            # Convert to mappings for both class_id -> name and wordnet_id -> name
+            class_labels = {}  # class_id -> name
+            wordnet_to_name = {}  # wordnet_id -> name
+
             for class_id, (wordnet_id, class_name) in labels_data.items():
                 class_labels[class_id] = class_name
+                wordnet_to_name[wordnet_id] = class_name
 
             print(f"Loaded {len(class_labels)} class labels from {labels_path}")
-            return class_labels
+            return class_labels, wordnet_to_name
         except Exception as e:
             print(f"Warning: Could not load class labels from {labels_path}: {e}")
-            return {}
+            return {}, {}
 
     def get_class_name(self, class_id):
         """Convert class ID to human-readable name"""
@@ -73,11 +76,8 @@ class EditSetVisualizer:
         elif isinstance(class_id, str):
             # Handle both string numbers and wordnet IDs
             if class_id.startswith("n"):
-                # If it's a wordnet ID, find the corresponding class name
-                for cid, name in self.class_labels.items():
-                    if class_id in self.class_labels.get(cid, ""):
-                        return name
-                return class_id  # Return as-is if not found
+                # If it's a wordnet ID, look it up directly
+                return self.wordnet_to_name.get(class_id, class_id)
             # Otherwise treat as class ID
             pass
         else:
