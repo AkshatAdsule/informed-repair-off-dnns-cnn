@@ -41,10 +41,49 @@ class EditSetVisualizer:
         self.metadata = None
         self.current_edit_set = None
         self.available_edit_sets = self.discover_edit_sets()
+        # Load class labels mapping
+        self.class_labels = self.load_class_labels()
         # Load default edit set
         if self.available_edit_sets:
             self.load_edit_set(list(self.available_edit_sets.keys())[0])
         self.load_dataset_info()
+
+    def load_class_labels(self):
+        """Load the ImageNet class labels from labels.json"""
+        labels_path = "data/imagenet-mini/labels.json"
+        try:
+            with open(labels_path, "r") as f:
+                labels_data = json.load(f)
+
+            # Convert to a mapping from class_id (string) to human-readable name
+            class_labels = {}
+            for class_id, (wordnet_id, class_name) in labels_data.items():
+                class_labels[class_id] = class_name
+
+            print(f"Loaded {len(class_labels)} class labels from {labels_path}")
+            return class_labels
+        except Exception as e:
+            print(f"Warning: Could not load class labels from {labels_path}: {e}")
+            return {}
+
+    def get_class_name(self, class_id):
+        """Convert class ID to human-readable name"""
+        if isinstance(class_id, (int, float)):
+            class_id = str(int(class_id))
+        elif isinstance(class_id, str):
+            # Handle both string numbers and wordnet IDs
+            if class_id.startswith("n"):
+                # If it's a wordnet ID, find the corresponding class name
+                for cid, name in self.class_labels.items():
+                    if class_id in self.class_labels.get(cid, ""):
+                        return name
+                return class_id  # Return as-is if not found
+            # Otherwise treat as class ID
+            pass
+        else:
+            class_id = str(class_id)
+
+        return self.class_labels.get(class_id, f"Class_{class_id}")
 
     def discover_edit_sets(self):
         """Discover all available edit sets in the data/edit_sets directory"""
@@ -160,9 +199,13 @@ class EditSetVisualizer:
             true_class = item["true_class"]
             pred_class = item["predicted_class"]
 
-            true_class_counts[true_class] += 1
-            pred_class_counts[pred_class] += 1
-            confusion_pairs[(true_class, pred_class)] += 1
+            # Convert to human-readable names
+            true_class_name = self.get_class_name(true_class)
+            pred_class_name = self.get_class_name(pred_class)
+
+            true_class_counts[true_class_name] += 1
+            pred_class_counts[pred_class_name] += 1
+            confusion_pairs[(true_class_name, pred_class_name)] += 1
 
         # Convert tuple keys to strings for JSON serialization
         confusion_pairs_serializable = {
@@ -459,14 +502,23 @@ def get_images():
         image_tensor = visualizer.edit_data["images"][i]
         image_b64 = visualizer.get_image_tensor_as_base64(image_tensor)
 
+        # Get human-readable class names
+        true_class_name = visualizer.get_class_name(meta["true_label"])
+        predicted_class_name = visualizer.get_class_name(meta["predicted_label"])
+
         images_data.append(
             {
                 "index": i,
                 "image_data": image_b64,
                 "true_class": meta["true_class"],
                 "predicted_class": meta["predicted_class"],
-                "true_label": meta["true_label"],
-                "predicted_label": meta["predicted_label"],
+                "true_label": true_class_name,
+                "predicted_label": predicted_class_name,
+                # Also include original labels if they exist in metadata
+                "true_label_original": meta.get("true_label", true_class_name),
+                "predicted_label_original": meta.get(
+                    "predicted_label", predicted_class_name
+                ),
             }
         )
 
