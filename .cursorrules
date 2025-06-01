@@ -1,0 +1,39 @@
+# Cursor Rules for UV Environment
+
+## Python Package Management
+- Always use `uv` for Python package management instead of pip, conda, or other tools
+- When adding new dependencies, use `uv add <package_name>` instead of pip install
+- For development dependencies, use `uv add --dev <package_name>`
+- For optional dependencies, use `uv add --optional <group_name> <package_name>`
+
+## Script Execution
+- Always run Python scripts using `uv run <script_name>` instead of direct python execution
+- For running modules, use `uv run -m <module_name>` instead of `python -m`
+- For interactive Python sessions, use `uv run python` or `uv run ipython`
+
+## Environment Management
+- The project uses uv for virtual environment management
+- Dependencies are managed in `pyproject.toml` and locked in `uv.lock`
+- Never suggest activating virtual environments manually - uv handles this automatically
+- When suggesting package installations, always use uv commands
+
+## Common Commands
+- Install dependencies: `uv sync` (not pip install -r requirements.txt)
+- Add new package: `uv add <package>`
+- Remove package: `uv remove <package>`
+- Run scripts: `uv run <script>`
+- Run tests: `uv run pytest` or `uv run python -m pytest`
+- Show dependencies: `uv tree`
+- Update dependencies: `uv lock --upgrade`
+
+## Code Suggestions
+- When suggesting terminal commands, always use uv equivalents
+- When writing documentation or README files, include uv-based instructions
+- If suggesting Docker or CI/CD configurations, use uv in the setup steps
+- When debugging environment issues, suggest uv-specific troubleshooting steps
+
+## Project Structure
+- This project uses pyproject.toml for dependency specification
+- uv.lock contains the locked dependency versions
+- Do not suggest creating requirements.txt files
+- Do not suggest using pip, pipenv, poetry, or conda commands 
