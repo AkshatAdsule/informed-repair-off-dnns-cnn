@@ -44,6 +44,11 @@ from .neuron_contribution import (
     ConsistencyContributionHeuristic,
     PathStrengthHeuristic,
 )
+from .raw_repair import (
+    RawRepairHeuristic,
+    ConservativeRawRepairHeuristic,
+    LayerSubsetRawRepairHeuristic,
+)
 
 # Registry of all available heuristics
 HEURISTIC_REGISTRY = {
@@ -78,6 +83,10 @@ HEURISTIC_REGISTRY = {
     "variance_contribution": VarianceContributionHeuristic,
     "consistency_contribution": ConsistencyContributionHeuristic,
     "path_strength": PathStrengthHeuristic,
+    # Raw repair heuristics
+    "raw_repair": RawRepairHeuristic,
+    "conservative_raw_repair": ConservativeRawRepairHeuristic,
+    "layer_subset_raw_repair": LayerSubsetRawRepairHeuristic,
 }
 
 
@@ -155,6 +164,11 @@ def list_all_heuristics():
             "consistency_contribution",
             "path_strength",
         ],
+        "Raw Repair": [
+            "raw_repair",
+            "conservative_raw_repair",
+            "layer_subset_raw_repair",
+        ],
     }
 
     for category, heuristics in categories.items():
@@ -196,6 +210,10 @@ __all__ = [
     "VarianceContributionHeuristic",
     "ConsistencyContributionHeuristic",
     "PathStrengthHeuristic",
+    # Raw repair heuristics
+    "RawRepairHeuristic",
+    "ConservativeRawRepairHeuristic",
+    "LayerSubsetRawRepairHeuristic",
     # Utility functions
     "get_available_heuristics",
     "create_heuristic",
